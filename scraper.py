@@ -30,7 +30,7 @@ def scrape_product(url):
 #     endpoint_url = sb.get_endpoint_url()
     with sync_playwright() as p:
         # browser = p.chromium.connect_over_cdp(endpoint_url)
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         # context = browser.contexts[0]
         # page = context.pages[0]
         page = browser.new_page()
@@ -50,6 +50,7 @@ def scrape_product(url):
         # print(product_name,product_price)
         product_price = float(re.sub(r'[^0-9.]', '', product_price))
         print(product_price)
+        browser.close()
 
     return (product_name, product_price)
 

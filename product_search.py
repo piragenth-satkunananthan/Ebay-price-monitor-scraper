@@ -8,7 +8,7 @@ def scrape_search_page(keyword):
     # endpoint_url = sb.get_endpoint_url()
     with sync_playwright() as p:
         # browser = p.chromium.connect_over_cdp(endpoint_url)
-        browser = p.firefox.launch(headless=False)
+        browser = p.firefox.launch(headless=True)
 
         # context = browser.contexts[0]
         # page = context.pages[0]
@@ -44,6 +44,7 @@ def scrape_search_page(keyword):
                                       "price_range": price_range,
                                       "image_link": image_link
                                       })
+            browser.close()
 
         return product_name_list
 # print(scrape_search_page("pencil"))

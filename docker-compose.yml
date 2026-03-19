@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: .
+    container_name: ebay_frontend
+    # Runs the Streamlit dashboard on port 8501
+    command: uv run --python 3.12 streamlit run main.py --server.address=0.0.0.0
+    ports:
+      - "8501:8501"
+    volumes:
+      # Maps the local ./data folder to the container so the database persists
+      - ./data:/app/data
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  scraper:
+    build: .
+    container_name: ebay_scraper_worker
+    # Runs the continuous loop script
+    command: uv run --python 3.12 run_scraper.py
+    volumes:
+      # Shares the exact same database folder as the frontend
+      - ./data:/app/data
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
