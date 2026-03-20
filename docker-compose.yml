@@ -21,7 +21,7 @@ services:
   scraper:
     build: .
     container_name: ebay_scraper_worker
-    command: uv sync && uv run --python 3.12 run_scraper.py
+    command: uv run --python 3.12 run_scraper.py
     volumes:
       - .:/app
     restart: unless-stopped
