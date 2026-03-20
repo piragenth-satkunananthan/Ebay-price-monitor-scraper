@@ -9,3 +9,4 @@ wheels/
 # Virtual environments
 .venv
 ebay_scraper.db
+uv.lock
