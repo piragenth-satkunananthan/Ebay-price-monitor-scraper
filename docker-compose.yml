@@ -12,11 +12,11 @@ services:
       # Maps the local ./data folder to the container so the database persists
       - .:/app
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+#    logging:
+#      driver: "json-file"
+#      options:
+#        max-size: "10m"
+#        max-file: "3"
 
   scraper:
     build: .
@@ -25,8 +25,8 @@ services:
     volumes:
       - .:/app
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+#    logging:
+#      driver: "json-file"
+#      options:
+#        max-size: "10m"
+#        max-file: "3"
