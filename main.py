@@ -4,6 +4,9 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+
+from playwright.sync_api import sync_playwright
+
 import database as db
 from product_search import scrape_search_page
 import io
@@ -375,15 +378,18 @@ def product_search_page():
     # ── Run Search ──
     if search_clicked and keyword:
         with st.spinner(f"Scraping eBay for **{keyword}**…"):
-            results = scrape_search_page(keyword)
-            if not results:
-                st.warning("No results found for that keyword.")
-            else:
-                df = pd.DataFrame(results)
-                if "select" not in df.columns:
-                    df.insert(0, "select", False)
-                st.session_state.results_df = df
-
+            with sync_playwright() as p:
+                browser = p.firefox.launch(headless=False)
+                page = browser.new_page()
+                results = scrape_search_page(keyword,page)
+                if not results:
+                    st.warning("No results found for that keyword.")
+                else:
+                    df = pd.DataFrame(results)
+                    if "select" not in df.columns:
+                        df.insert(0, "select", False)
+                    st.session_state.results_df = df
+                browser.close()
     # ── Results Table ──
     if not st.session_state.results_df.empty:
         st.divider()

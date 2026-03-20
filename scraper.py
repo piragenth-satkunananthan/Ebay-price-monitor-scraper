@@ -16,29 +16,36 @@ cursor = conn.cursor()
 def main():
     url_id_list=retrive_product_link_from_db()
 
+    with sync_playwright() as p:
+        browser = p.firefox.launch(headless=False)
+        page = browser.new_page()
+        page.wait_for_selector("div.x-price-primary")
 
-    for index,row in url_id_list.iterrows():
-        url = str(row['url'])
-        id = int(row['id'])
-        # print(url)
-        product_name,product_price=scrape_product(url)
-        add_price_history_to_db(id,product_price)
+        for index,row in url_id_list.iterrows():
+            url = str(row['url'])
+            id = int(row['id'])
+            # print(url)
+            try:
+                product_name,product_price=scrape_product(url,page)
+                add_price_history_to_db(id,product_price)
+            except:
+                continue
+        browser.close()
 
-
-def scrape_product(url):
+def scrape_product(url,page):
 #    sb = sb_cdp.Chrome()
 #     endpoint_url = sb.get_endpoint_url()
-    with sync_playwright() as p:
-        # browser = p.chromium.connect_over_cdp(endpoint_url)
-        browser = p.chromium.launch(headless=True)
-        # context = browser.contexts[0]
-        # page = context.pages[0]
-        page = browser.new_page()
-        page.goto(url)
+    # browser = p.chromium.connect_over_cdp(endpoint_url)
+    # browser = p.chromium.launch(headless=False)
+    # context = browser.contexts[0]
+    # page = context.pages[0]
+    # page = browser.new_page()
+    page.goto(url)
 
 
-        # sb.solve_captcha()
-        # page.wait_for_selector("h1.x-item-title__mainTitle")
+    # sb.solve_captcha()
+    # page.wait_for_selector("h1.x-item-title__mainTitle")
+    try:
         product_name = page.locator("div.x-item-title").inner_text()
         # product_price = float(page.locator('div.x-price-primary').nth(0).locator('.ux-textspans').first.inner_text().split('$')[-1])
         product_price = page.query_selector("span.x-price-approx__price")
@@ -50,9 +57,12 @@ def scrape_product(url):
         # print(product_name,product_price)
         product_price = float(re.sub(r'[^0-9.]', '', product_price))
         print(product_price)
-        browser.close()
+        return (product_name, product_price)
 
-    return (product_name, product_price)
+    except:
+        print("no price found")
+
+
 
 # print(scrape_product("https://www.ebay.com/itm/127746082819"))
 

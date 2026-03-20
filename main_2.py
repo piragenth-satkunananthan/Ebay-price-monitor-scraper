@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from playwright.sync_api import sync_playwright
+
 import database as db
 from product_search import scrape_search_page
 
@@ -53,16 +55,19 @@ def product_search_page():
 
     if search_clicked and keyword:
         with st.spinner(f"Scraping eBay for '{keyword}'..."):
-            results = scrape_search_page(keyword)
+            with sync_playwright() as p:
+                browser = p.firefox.launch(headless=False)
+                page = browser.new_page()
+                results = scrape_search_page(keyword,page)
 
-            if not results:
-                st.warning("Sorry, no results found!")
-            else:
-                df = pd.DataFrame(results)
-                # Insert checkbox column
-                if "select" not in df.columns:
-                    df.insert(0, "select", False)
-                st.session_state.results_df = df
+                if not results:
+                    st.warning("Sorry, no results found!")
+                else:
+                    df = pd.DataFrame(results)
+                    # Insert checkbox column
+                    if "select" not in df.columns:
+                        df.insert(0, "select", False)
+                    st.session_state.results_df = df
 
     if not st.session_state.results_df.empty:
         st.divider()

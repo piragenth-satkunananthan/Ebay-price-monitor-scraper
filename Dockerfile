@@ -26,10 +26,11 @@ RUN apt-get update && apt-get install -y \
     libgdk-pixbuf-2.0-0 \
     libglib2.0-0 \
     libxrender1 \
-    libasound2 \
+#    libasound2 \
+    libasound2t64 \
     libfreetype6 \
     libfontconfig1 \
-    libdbus-1-3
+    libdbus-1-3 \
 #    python3 \
 #    python3-pip \
 #    python3-venv \
