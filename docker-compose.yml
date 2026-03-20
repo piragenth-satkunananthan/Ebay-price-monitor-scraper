@@ -10,7 +10,7 @@ services:
       - "8501:8501"
     volumes:
       # Maps the local ./data folder to the container so the database persists
-      - ./data:/app/data
+      - .:/app
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -21,9 +21,9 @@ services:
   scraper:
     build: .
     container_name: ebay_scraper_worker
-    command: uv run --python 3.12 run_scraper.py
+    command: uv sync && uv run --python 3.12 run_scraper.py
     volumes:
-      - ./data:/app/data
+      - .:/app
     restart: unless-stopped
     logging:
       driver: "json-file"

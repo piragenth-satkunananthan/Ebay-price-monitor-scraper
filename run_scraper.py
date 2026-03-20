@@ -4,7 +4,7 @@ from scraper import main as scrape_all_prices
 INTERVAL_SECONDS = 60
 
 if __name__ == "__main__":
-    print("🚀 Starting background eBay scraper...")
+    print("Starting background eBay scraper...")
     while True:
         try:
             print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Scraping latest prices...")
