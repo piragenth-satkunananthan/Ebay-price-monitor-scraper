@@ -21,10 +21,8 @@ services:
   scraper:
     build: .
     container_name: ebay_scraper_worker
-    # Runs the continuous loop script
     command: uv run --python 3.12 run_scraper.py
     volumes:
-      # Shares the exact same database folder as the frontend
       - ./data:/app/data
     restart: unless-stopped
     logging:

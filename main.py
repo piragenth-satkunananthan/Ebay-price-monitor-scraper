@@ -379,7 +379,7 @@ def product_search_page():
     if search_clicked and keyword:
         with st.spinner(f"Scraping eBay for **{keyword}**…"):
             with sync_playwright() as p:
-                browser = p.firefox.launch(headless=False)
+                browser = p.firefox.launch(headless=True)
                 page = browser.new_page()
                 results = scrape_search_page(keyword,page)
                 if not results:

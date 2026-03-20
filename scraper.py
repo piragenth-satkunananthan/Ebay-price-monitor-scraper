@@ -2,9 +2,7 @@ import re
 
 import pandas as pd
 from playwright.sync_api import sync_playwright
-import sqlite3
-conn = sqlite3.connect("ebay_scraper.db", check_same_thread=False)
-cursor = conn.cursor()
+import database as db
 
 #from seleniumbase import sb_cdp
 # from bs4 import BeautifulSoup
@@ -14,12 +12,12 @@ cursor = conn.cursor()
 
 
 def main():
-    url_id_list=retrive_product_link_from_db()
+    url_id_list=db.retrive_product_link_from_db()
 
     with sync_playwright() as p:
-        browser = p.firefox.launch(headless=False)
+        browser = p.firefox.launch(headless=True)
         page = browser.new_page()
-        page.wait_for_selector("div.x-price-primary")
+        # page.wait_for_selector("div.x-price-primary")
 
         for index,row in url_id_list.iterrows():
             url = str(row['url'])
@@ -27,7 +25,7 @@ def main():
             # print(url)
             try:
                 product_name,product_price=scrape_product(url,page)
-                add_price_history_to_db(id,product_price)
+                db.add_price_history_to_db(id,product_price)
             except:
                 continue
         browser.close()
@@ -66,27 +64,8 @@ def scrape_product(url,page):
 
 # print(scrape_product("https://www.ebay.com/itm/127746082819"))
 
-def retrive_product_link_from_db():
-    # Use a real URL from your database
 
 
-    # This query joins the tables so you get the title AND the prices in one go
-    query = """
-            SELECT id,url from products;
-            """
-
-    product_history = pd.read_sql(query, conn)
-
-
-
-    return product_history
-
-
-
-def add_price_history_to_db(product_id,price):
-    cursor.execute("insert into price_history(product_id,price) values (?,?)", (product_id,price))
-
-    conn.commit()
 
 
 main()

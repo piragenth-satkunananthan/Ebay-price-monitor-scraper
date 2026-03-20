@@ -76,6 +76,29 @@ def get_monitored_products():
     return pd.read_sql(query, conn)
 
 
+
+def retrive_product_link_from_db():
+
+
+    query = """
+            SELECT id,url from products;
+            """
+
+    product_history = pd.read_sql(query, conn)
+
+
+
+    return product_history
+
+def add_price_history_to_db(product_id,price):
+    cursor.execute("insert into price_history(product_id,price) values (?,?)", (product_id,price))
+
+    conn.commit()
+
+
+
+
+
 def get_product_price_history(product_id):
     """Fetches the full price timeline for a specific product."""
     query = '''
