@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 
 WORKDIR /app
-COPY . .
+#COPY . .
 
 #RUN apt-get update && apt-get install -y \
 #    libxcb-shm0 \
@@ -48,7 +48,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 #ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 
-#COPY requirements.txt .
+COPY pyproject.toml uv.lock* ./
 RUN uv sync
 #
 #

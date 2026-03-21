@@ -3,6 +3,7 @@ version: '3.8'
 services:
   frontend:
     build: .
+    image: ebay-price-monitor:latest
     container_name: ebay_frontend
     # Runs the Streamlit dashboard on port 8501
     command: uv run --python 3.12 streamlit run main.py --server.address=0.0.0.0
@@ -19,7 +20,7 @@ services:
 #        max-file: "3"
 
   scraper:
-    build: .
+    image: ebay-price-monitor:latest
     container_name: ebay_scraper_worker
     command: uv run --python 3.12 run_scraper.py
     volumes:
