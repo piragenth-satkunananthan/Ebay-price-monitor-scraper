@@ -15,7 +15,7 @@ import io
 #  Page Configuration
 # ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="PriceWatch Pro",
+    page_title="Ebay price monitory & scraper",
     page_icon="📡",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -203,7 +203,7 @@ def price_stats(history_df: pd.DataFrame) -> dict:
 #  Sidebar
 # ─────────────────────────────────────────────
 with st.sidebar:
-    st.markdown('<p class="pw-title" style="font-size:1.4rem">📡 PriceWatch Pro</p>', unsafe_allow_html=True)
+    st.markdown('<p class="pw-title" style="font-size:1.4rem">Ebay price monitor & scraper</p>', unsafe_allow_html=True)
     st.markdown('<p class="pw-subtitle">eBay Intelligence Suite</p>', unsafe_allow_html=True)
     st.divider()
 
