@@ -1,7 +1,7 @@
 import time
 from scraper import main as scrape_all_prices
 
-INTERVAL_SECONDS = 60 * 60
+INTERVAL_SECONDS = 60 * 60 * 10
 
 if __name__ == "__main__":
     print("Starting background eBay scraper...",flush=True)
