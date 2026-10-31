@@ -1,0 +1,39 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  frontend:
+    build: .
+    image: ebay-price-monitor:latest
+    container_name: ebay_frontend
+    command: uv run --python 3.12 streamlit run main.py --server.address=0.0.0.0 --server.port=8501 --server.headless=true
+    environment:
+      - DEMO_MODE=true
+    volumes:
+      - .:/app
+    shm_size: "1gb"
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      default:
+      web:
+        aliases:
+          - ebay-frontend
+
+  scraper:
+    image: ebay-price-monitor:latest
+    container_name: ebay_scraper_worker
+    command: uv run --python 3.12 run_scraper.py
+    volumes:
+      - .:/app
+    shm_size: "1gb"
+    restart: unless-stopped
+    logging: *default-logging
+    profiles: ["worker"]   # off by default; see step 5
+
+networks:
+  web:
+    external: true
