@@ -9,7 +9,8 @@ services:
     build: .
     image: ebay-price-monitor:latest
     container_name: ebay_frontend
-    command: uv run --python 3.12 streamlit run main.py --server.address=0.0.0.0 --server.port=8501 --server.headless=true
+    init: true
+    command: xvfb-run -a uv run --python 3.12 streamlit run main.py --server.address=0.0.0.0 --server.port=8501 --server.headless=true
     environment:
       - DEMO_MODE=true
     volumes:

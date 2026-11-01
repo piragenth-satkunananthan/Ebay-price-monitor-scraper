@@ -5,11 +5,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Error as PlaywrightError, sync_playwright
 
 import database as db
-from product_search import scrape_search_page
+from product_search import SearchError, scrape_search_page
 import io
+import logging
+
+logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────
 #  Page Configuration
@@ -376,12 +379,33 @@ def product_search_page():
                 st.error(f"Import failed: {e}")
 
     # ── Run Search ──
-    if search_clicked and keyword:
-        with st.spinner(f"Scraping eBay for **{keyword}**…"):
-            with sync_playwright() as p:
-                browser = p.firefox.launch(headless=True)
-                page = browser.new_page()
-                results = scrape_search_page(keyword,page)
+    if search_clicked:
+        keyword = keyword.strip()
+        st.session_state.results_df = pd.DataFrame()
+        if not keyword:
+            st.warning("Enter a keyword to search eBay.")
+        else:
+            with st.spinner(f"Scraping eBay for **{keyword}**…"):
+                try:
+                    with sync_playwright() as p:
+                        # Docker provides Xvfb for headed Chromium; eBay rejected
+                        # the headless browsers in live access checks.
+                        browser = p.chromium.launch(headless=False)
+                        try:
+                            context = browser.new_context(
+                                locale="en-US", viewport={"width": 1440, "height": 1000}
+                            )
+                            page = context.new_page()
+                            results = scrape_search_page(keyword, page)
+                        finally:
+                            browser.close()
+                except SearchError as exc:
+                    st.error(str(exc))
+                    return
+                except PlaywrightError:
+                    logger.exception("Browser failed during eBay search")
+                    st.error("The search browser is unavailable. Please try again later or use CSV import.")
+                    return
                 if not results:
                     st.warning("No results found for that keyword.")
                 else:
@@ -389,7 +413,6 @@ def product_search_page():
                     if "select" not in df.columns:
                         df.insert(0, "select", False)
                     st.session_state.results_df = df
-                browser.close()
     # ── Results Table ──
     if not st.session_state.results_df.empty:
         st.divider()

@@ -5,13 +5,15 @@ services:
     build: .
     image: ebay-price-monitor:latest
     container_name: ebay_frontend
+    init: true
     # Runs the Streamlit dashboard on port 8501
-    command: uv run --python 3.12 streamlit run main.py --server.address=0.0.0.0
+    command: xvfb-run -a uv run --python 3.12 streamlit run main.py --server.address=0.0.0.0 --server.headless=true
     ports:
       - "8501:8501"
     volumes:
       # Maps the local ./data folder to the container so the database persists
       - .:/app
+    shm_size: "1gb"
     restart: unless-stopped
 #    logging:
 #      driver: "json-file"
