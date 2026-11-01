@@ -3,7 +3,7 @@
 import ast
 from pathlib import Path
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
@@ -102,8 +102,31 @@ class BrowserSearchTests(unittest.TestCase):
 
     def test_verification_page_with_success_status(self):
         self.serve("<title>Pardon Our Interruption</title>Please verify yourself")
-        with self.assertRaisesRegex(SearchError, "verification"):
-            scrape_search_page("pencil", self.page)
+        with patch("product_search.SEARCH_TIMEOUT_MS", 150):
+            with self.assertRaisesRegex(SearchError, "verification"):
+                scrape_search_page("pencil", self.page)
+
+    def test_automatic_verification_redirects_to_real_results(self):
+        self.page.route("**/*", lambda route: route.fulfill(
+            content_type="text/html",
+            body=(card() if 'verified=1' in route.request.url else '''
+                <title>Pardon Our Interruption...</title>Checking your browser
+                <script>setTimeout(() => location.href = '/sch/i.html?verified=1', 200)</script>
+            ''')))
+        self.assertEqual(len(scrape_search_page("pencil", self.page)), 1)
+
+    def test_automatic_verification_replaces_content_without_navigation(self):
+        self.serve('''<title>Pardon Our Interruption...</title><body>Checking your browser
+            <script>setTimeout(() => {
+                document.title = 'Search results'; document.body.innerHTML = `%s`;
+            }, 200)</script></body>''' % card())
+        self.assertEqual(len(scrape_search_page("pencil", self.page)), 1)
+
+    def test_hundred_results_does_not_mean_zero_results(self):
+        self.serve("<h1>100 results for pencil</h1><p>Unrecognized card layout</p>")
+        with patch("product_search.SEARCH_TIMEOUT_MS", 150):
+            with self.assertRaisesRegex(SearchError, "in time"):
+                scrape_search_page("pencil", self.page)
 
     def test_genuine_empty_results(self):
         self.serve("<h1>0 results for this keyword</h1>")
@@ -126,7 +149,7 @@ class BrowserSearchTests(unittest.TestCase):
 
 
 class SearchUITests(unittest.TestCase):
-    def test_blocked_search_shows_message_closes_browser_and_clears_old_results(self):
+    def test_blocked_search_shows_message_and_clears_old_results(self):
         import pandas as pd
         from streamlit.testing.v1 import AppTest
 
@@ -137,29 +160,20 @@ class SearchUITests(unittest.TestCase):
         preamble = '''import streamlit as st
 import pandas as pd
 import logging
-from playwright.sync_api import Error as PlaywrightError, sync_playwright
-from product_search import SearchError, scrape_search_page
+from playwright.sync_api import Error as PlaywrightError
+from product_search import SearchError, search_ebay as fetch_search_results
 logger = logging.getLogger(__name__)
 '''
         app = AppTest.from_string(preamble + ast.get_source_segment(source, function) + "\nproduct_search_page()")
         app.run()
         app.session_state.results_df = pd.DataFrame([{"title": "Old search result"}])
         app.text_input[0].set_value("pencil")
-        browser = Mock()
-        playwright = Mock()
-        playwright.chromium.launch.return_value = browser
-        context = Mock()
-        context.__enter__ = Mock(return_value=playwright)
-        context.__exit__ = Mock(return_value=False)
         message = "eBay refused this search (HTTP 403). Please try again later or use CSV import."
-        with patch("playwright.sync_api.sync_playwright", return_value=context):
-            with patch("product_search.scrape_search_page", side_effect=SearchError(message)):
-                app.button[0].click().run()
+        with patch("product_search.search_ebay", side_effect=SearchError(message)):
+            app.button[0].click().run()
         self.assertEqual(len(app.exception), 0)
         self.assertEqual(app.error[0].value, message)
         self.assertTrue(app.session_state.results_df.empty)
-        playwright.chromium.launch.assert_called_once_with(headless=False)
-        browser.close.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -8,5 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+.browser-state/
 ebay_scraper.db
 uv.lock

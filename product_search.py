@@ -5,7 +5,9 @@ import re
 from urllib.parse import urlencode, urljoin, urlsplit
 
 from bs4 import BeautifulSoup
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
+
+from ebay_browser import SearchError, open_ebay_page
 
 
 logger = logging.getLogger(__name__)
@@ -19,11 +21,16 @@ BLOCKED_MESSAGES = (
     "something went wrong on our end", "verify you're human", "verify you are human",
     "checking your browser", "please verify yourself",
 )
-EMPTY_MESSAGES = ("0 results for", "no results found", "no exact matches found")
+EMPTY_MESSAGES = ("no results found", "no exact matches found")
+EMPTY_RESULTS_PATTERN = r"\b0\s+results\b"
 
 
-class SearchError(RuntimeError):
-    """An eBay search could not be completed; safe to display in the UI."""
+def search_ebay(keyword):
+    """Search with a reusable browser profile instead of a new identity per click."""
+    if not keyword.strip():
+        return []
+    with open_ebay_page() as page:
+        return scrape_search_page(keyword, page)
 
 
 def parse_search_results(html):
@@ -82,22 +89,23 @@ def scrape_search_page(keyword, page):
                 )
             raise SearchError(f"eBay search is unavailable (HTTP {response.status}). Please try again later.")
 
-        # Wait for useful content or a known empty/error state, never an unrelated footer.
+        # An automatic verification page can redirect to listings after several
+        # seconds. Do not treat its title/body as a completed search response.
         page.wait_for_function(
-            """({cards, blockedTitles, blockedMessages, emptyMessages}) => {
+            """({cards, emptyMessages}) => {
                 const title = document.title.toLowerCase();
                 const text = (document.body?.innerText || '').toLowerCase();
                 return [...document.querySelectorAll(cards)].some(card =>
                     card.querySelector('a[href*="/itm/"]') &&
                     card.querySelector('.s-card__title, .s-item__title')?.textContent.trim() &&
                     card.querySelector('.s-card__price, .s-item__price')?.textContent.trim()) ||
-                    blockedTitles.some(value => title.includes(value)) ||
-                    blockedMessages.some(value => text.includes(value)) ||
+                    title.includes('error page') || title.includes('access denied') ||
+                    text.includes('something went wrong on our end') ||
+                    /\\b0\\s+results\\b/i.test(text) ||
                     emptyMessages.some(value => text.includes(value)) ||
-                    !!document.querySelector('#captcha_form, iframe[src*="captcha"], .srp-save-null-search');
+                    !!document.querySelector('.srp-save-null-search');
             }""",
-            arg={"cards": CARD_SELECTOR, "blockedTitles": BLOCKED_TITLES,
-                 "blockedMessages": BLOCKED_MESSAGES, "emptyMessages": EMPTY_MESSAGES},
+            arg={"cards": CARD_SELECTOR, "emptyMessages": EMPTY_MESSAGES},
             timeout=SEARCH_TIMEOUT_MS,
         )
         soup = BeautifulSoup(page.content(), "html.parser")
@@ -112,10 +120,30 @@ def scrape_search_page(keyword, page):
         results = parse_search_results(str(soup))
         if results:
             return results
-        if any(value in text for value in EMPTY_MESSAGES) or soup.select_one(".srp-save-null-search"):
+        if (re.search(EMPTY_RESULTS_PATTERN, text)
+                or any(value in text for value in EMPTY_MESSAGES)
+                or soup.select_one(".srp-save-null-search")):
             return []
         raise SearchError("eBay's search page could not be read. Please try again later or use CSV import.")
     except PlaywrightTimeoutError as exc:
+        # A persistent challenge requires human verification; a temporary one
+        # was given the entire content timeout to finish without another request.
+        try:
+            soup = BeautifulSoup(page.content(), "html.parser")
+            title = soup.title.get_text(" ", strip=True).lower() if soup.title else ""
+            text = soup.get_text(" ", strip=True).lower()
+            verification = (
+                any(value in title for value in BLOCKED_TITLES)
+                or any(value in text for value in BLOCKED_MESSAGES)
+                or soup.select_one('#captcha_form, iframe[src*="captcha"]')
+            )
+        except PlaywrightError:
+            verification = False
+        if verification:
+            raise SearchError(
+                "eBay requires browser verification that did not finish. "
+                "Please try again later or use CSV import."
+            ) from exc
         raise SearchError(
             "eBay did not load a readable search page in time. Please try again later or use CSV import."
         ) from exc

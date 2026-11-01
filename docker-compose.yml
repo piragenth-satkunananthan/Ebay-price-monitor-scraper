@@ -24,9 +24,11 @@ services:
   scraper:
     image: ebay-price-monitor:latest
     container_name: ebay_scraper_worker
-    command: uv run --python 3.12 run_scraper.py
+    init: true
+    command: xvfb-run -a uv run --python 3.12 run_scraper.py
     volumes:
       - .:/app
+    shm_size: "1gb"
     restart: unless-stopped
 #    logging:
 #      driver: "json-file"

@@ -1,62 +1,16 @@
-#FROM ubuntu:24.04
-FROM mcr.microsoft.com/playwright:v1.58.0-noble
-ENV DEBIAN_FRONTEND=noninteractive
+FROM mcr.microsoft.com/playwright:v1.64.0-noble
 
+ENV DEBIAN_FRONTEND=noninteractive \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    PATH="/opt/venv/bin:${PATH}"
 
 WORKDIR /app
-#COPY . .
-
-#RUN apt-get update && apt-get install -y \
-#    libxcb-shm0 \
-#    libx11-xcb1 \
-#    libx11-6 \
-#    libxcb1 \
-#    libxext6 \
-#    libxrandr2 \
-#    libxcomposite1 \
-#    libxcursor1 \
-#    libxdamage1 \
-#    libxfixes3 \
-#    libxi6 \
-#    libgtk-3-0 \
-#    libpangocairo-1.0-0 \
-#    libpango-1.0-0 \
-#    libatk1.0-0 \
-#    libcairo-gobject2 \
-#    libcairo2 \
-#    libgdk-pixbuf-2.0-0 \
-#    libglib2.0-0 \
-#    libxrender1 \
-##    libasound2 \
-#    libasound2t64 \
-#    libfreetype6 \
-#    libfontconfig1 \
-#    libdbus-1-3 \
-##    python3 \
-##    python3-pip \
-##    python3-venv \
-#    wget \
-#    && rm -rf /var/lib/apt/lists/*
-
-
-RUN ln -s /usr/bin/python3 /usr/bin/python
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
+# Keep dependencies outside /app: Compose mounts the source directory there.
+# The Playwright package and browser image versions must match.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --python 3.12
 
-#ENV VIRTUAL_ENV=/opt/venv
-#RUN uv venv $VIRTUAL_ENV
-#ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-
-COPY pyproject.toml uv.lock* ./
-RUN uv sync
-#
-#
-#RUN uv run playwright install chromium firefox
-#RUN uv run playwright install-deps
-
-
-#COPY . .
-
-
+COPY . .
 EXPOSE 8501

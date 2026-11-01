@@ -5,10 +5,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
-from playwright.sync_api import Error as PlaywrightError, sync_playwright
+from playwright.sync_api import Error as PlaywrightError
 
 import database as db
-from product_search import SearchError, scrape_search_page
+from product_search import SearchError, search_ebay
 import io
 import logging
 
@@ -117,6 +117,10 @@ def fetch_monitored_products():
 @st.cache_data(ttl=600)
 def fetch_price_history(product_id):
     return db.get_product_price_history(product_id)
+
+@st.cache_data(ttl=300, max_entries=128, show_spinner=False)
+def fetch_search_results(keyword):
+    return search_ebay(keyword)
 
 def refresh_data():
     fetch_monitored_products.clear()
@@ -387,18 +391,7 @@ def product_search_page():
         else:
             with st.spinner(f"Scraping eBay for **{keyword}**…"):
                 try:
-                    with sync_playwright() as p:
-                        # Docker provides Xvfb for headed Chromium; eBay rejected
-                        # the headless browsers in live access checks.
-                        browser = p.chromium.launch(headless=False)
-                        try:
-                            context = browser.new_context(
-                                locale="en-US", viewport={"width": 1440, "height": 1000}
-                            )
-                            page = context.new_page()
-                            results = scrape_search_page(keyword, page)
-                        finally:
-                            browser.close()
+                    results = fetch_search_results(keyword)
                 except SearchError as exc:
                     st.error(str(exc))
                     return

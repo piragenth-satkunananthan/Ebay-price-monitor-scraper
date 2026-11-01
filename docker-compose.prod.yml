@@ -1,3 +1,5 @@
+name: ebay-price-monitor-scraper
+
 x-logging: &default-logging
   driver: json-file
   options:
@@ -27,13 +29,13 @@ services:
   scraper:
     image: ebay-price-monitor:latest
     container_name: ebay_scraper_worker
-    command: uv run --python 3.12 run_scraper.py
+    init: true
+    command: xvfb-run -a uv run --python 3.12 run_scraper.py
     volumes:
       - .:/app
     shm_size: "1gb"
     restart: unless-stopped
     logging: *default-logging
-    profiles: ["worker"]   # off by default; see step 5
 
 networks:
   web:

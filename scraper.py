@@ -1,73 +1,72 @@
+"""Update saved prices without retrying an entire watchlist after an access block."""
+
+import logging
 import re
 
-import pandas as pd
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
+
 import database as db
+from ebay_browser import SearchError, open_ebay_page
 
-#from seleniumbase import sb_cdp
-# from bs4 import BeautifulSoup
-# from selenium.webdriver.support.expected_conditions import title_is
-# from seleniumbase.core.detect_b_ver import brave_on_windows_path
 
+logger = logging.getLogger(__name__)
 
 
 def main():
-    url_id_list=db.retrive_product_link_from_db()
-
-    with sync_playwright() as p:
-        browser = p.firefox.launch(headless=True)
-        page = browser.new_page()
-        # page.wait_for_selector("div.x-price-primary")
-
-        for index,row in url_id_list.iterrows():
-            url = str(row['url'])
-            id = int(row['id'])
-            # print(url)
+    products = db.retrive_product_link_from_db()
+    if products.empty:
+        logger.info("No monitored products; no browser needed")
+        return True
+    updated = 0
+    with open_ebay_page("worker") as page:
+        for _, row in products.iterrows():
+            product_id = int(row["id"])
             try:
-                product_name,product_price=scrape_product(url,page)
-                db.add_price_history_to_db(id,product_price)
-            except:
-                continue
-        browser.close()
-
-def scrape_product(url,page):
-#    sb = sb_cdp.Chrome()
-#     endpoint_url = sb.get_endpoint_url()
-    # browser = p.chromium.connect_over_cdp(endpoint_url)
-    # browser = p.chromium.launch(headless=False)
-    # context = browser.contexts[0]
-    # page = context.pages[0]
-    # page = browser.new_page()
-    page.goto(url)
+                _, price = scrape_product(str(row["url"]), page)
+                db.add_price_history_to_db(product_id, price)
+                updated += 1
+            except SearchError as exc:
+                logger.warning("Stopping price update after eBay access failure: %s", exc)
+                return False
+            except (PlaywrightError, ValueError) as exc:
+                logger.warning("Could not update product %s: %s", product_id, exc)
+    logger.info("Updated %s of %s monitored products", updated, len(products))
+    return True
 
 
-    # sb.solve_captcha()
-    # page.wait_for_selector("h1.x-item-title__mainTitle")
+def scrape_product(url, page):
+    response = page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+    if response is None:
+        raise SearchError("eBay did not return a product page.")
+    if response.status in (403, 429) or response.status >= 500:
+        raise SearchError(f"eBay refused product access (HTTP {response.status}).")
+    if response.status >= 400:
+        raise ValueError(f"Product page returned HTTP {response.status}")
     try:
-        product_name = page.locator("div.x-item-title").inner_text()
-        # product_price = float(page.locator('div.x-price-primary').nth(0).locator('.ux-textspans').first.inner_text().split('$')[-1])
-        product_price = page.query_selector("span.x-price-approx__price")
-
-        if product_price:
-            product_price = product_price.inner_text().split("$")[-1]
-        else:
-            product_price = page.locator('div.x-price-primary').nth(0).locator('.ux-textspans').first.inner_text().split('$')[-1]
-        # print(product_name,product_price)
-        product_price = float(re.sub(r'[^0-9.]', '', product_price))
-        print(product_price)
-        return (product_name, product_price)
-
-    except:
-        print("no price found")
-
-
-
-# print(scrape_product("https://www.ebay.com/itm/127746082819"))
-
-
-
-
-
-main()
+        page.wait_for_function("""() => {
+            const text = (document.body?.innerText || '').toLowerCase();
+            return document.querySelector('div.x-price-primary, span.x-price-approx__price') ||
+                document.title.toLowerCase().includes('error page') ||
+                document.title.toLowerCase().includes('access denied') ||
+                text.includes('something went wrong on our end');
+        }""", timeout=20_000)
+    except PlaywrightTimeoutError as exc:
+        if ("splashui" in page.url or "pardon our interruption" in page.title().lower()
+                or page.locator('#captcha_form, iframe[src*="captcha"]').count()):
+            raise SearchError("eBay product access requires browser verification.") from exc
+        raise
+    if any(value in page.title().lower() for value in ("error page", "access denied")):
+        raise SearchError("eBay returned an error page for product access.")
+    name = page.locator("div.x-item-title, h1.x-item-title__mainTitle").first.inner_text(timeout=2000)
+    price_node = page.query_selector("span.x-price-approx__price")
+    if price_node:
+        price_text = price_node.inner_text().split("$")[-1]
+    else:
+        price_text = page.locator("div.x-price-primary").first.inner_text(timeout=2000).split("$")[-1]
+    price = float(re.sub(r"[^0-9.]", "", price_text))
+    return name, price
 
 
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    main()

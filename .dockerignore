@@ -1,0 +1,16 @@
+.git
+.venv
+.browser-state
+.agents
+.codex
+.aws
+.ssh
+.idea
+__pycache__
+**/__pycache__
+*.py[cod]
+*.db
+*.db-*
+*.pem
+.env
+.env.*
